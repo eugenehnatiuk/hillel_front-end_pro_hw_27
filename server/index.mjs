@@ -7,7 +7,6 @@ import { WebSocketServer } from 'ws';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-
 const generateID = () => '_' + Math.random().toString(36).substring(2);
 
 const server = fastify();
@@ -27,15 +26,28 @@ server.post('/users', async (request, reply) => {
 const wss = new WebSocketServer({ server: server.server });
 
 wss.on('connection', (ws) => {
-
   console.log('WebSocket is connected');
+
   ws.on('message', (message) => {
     const data = JSON.parse(message.toString());
 
-    wss.clients.forEach((client) => {
-      client.send(JSON.stringify({ ...data }));
-    });
+    if (data.type && data.type === 'connected-user') {
+      const connectedUser = data.user;
+      wss.clients.forEach((client) => {
+        client.send(JSON.stringify({ connectedUser }));
+      });
+      } else if (data.disconnectedUser) {
+        const disconnectedUser = data.disconnectedUser;
+        wss.clients.forEach((client) => {
+          client.send(JSON.stringify({ disconnectedUser }));
+        });
+      } else {
+      wss.clients.forEach((client) => {
+        client.send(JSON.stringify({ ...data }));
+      });
+    }
   });
+  
 });
 
 const port = process.env.PORT || 5000;

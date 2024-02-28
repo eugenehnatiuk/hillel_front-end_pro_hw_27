@@ -27,13 +27,13 @@ messengerBtn.addEventListener('click', async () => {
 
       if (response.ok) {
         const data = await response.json();
-        debugger
+        // debugger
         const userID = data.userID;
         const userName = data.userName;
         localStorage.setItem('userID', userID);
         localStorage.setItem('userName', userName);
         console.log('Name has been saved');
-        fuckingSheet(); // Важливо ініціалізувати ВебСокет після отримання данних. Бо асинхронне отримання і веб сокет встигає считати минулі дані.
+        connectToWebSocket({ user: userName, type: 'connected-user' }); // Важливо ініціалізувати ВебСокет після отримання данних. Бо асинхронне отримання і веб сокет встигає считати минулі дані.
         setTimeout(() => {
           messengerLoader.style.display = 'none';
         }, 3000);
@@ -52,17 +52,34 @@ messengerBtn.addEventListener('click', async () => {
   }
 });
 
-function fuckingSheet() {
+function connectToWebSocket(obj) {
   const protocol = location.protocol === 'http:' ? 'ws' : 'wss';
   const ws = new WebSocket(`${protocol}://${location.host}`);
+
+  ws.onopen = () => {
+    const { user, type } = obj;
+    ws.send(JSON.stringify({ user, type }));
+  };
+
+  window.addEventListener('beforeunload',  () => {
+    const disconnectedUser = localStorage.getItem('userName');
+    ws.send(JSON.stringify({ disconnectedUser }));
+  });
+
+  // ws.onclose = () => {
+  //   const disconnectedUser = localStorage.getItem('userID');
+  //   ws.send(JSON.stringify({ disconnectedUser }));
+  // }
 
   // Відправка повідомлення
 
   const inputMessage = document.querySelector('.messenger__input-message');
-  const inputMessageBtn = document.querySelector('.messenger__input-message-btn');
+  const inputMessageBtn = document.querySelector(
+    '.messenger__input-message-btn'
+  );
 
   if (inputMessage) {
-    debugger
+    // debugger
     const userID = localStorage.getItem('userID');
     const userName = localStorage.getItem('userName');
 
@@ -82,21 +99,32 @@ function fuckingSheet() {
   const messagesContainer = document.querySelector('.messages');
 
   ws.onmessage = (event) => {
-    debugger;
+    // debugger;
     const data = JSON.parse(event.data);
-    const receivedUserID = data.userID;
-    const storedUserID = localStorage.getItem('userID');
-    const userName = data.userName;
-    const text = data.message;
-    const time = new Date().toLocaleString('uk-UA', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    if (receivedUserID === storedUserID) {
+    if (data.connectedUser) {
       messagesContainer.insertAdjacentHTML(
         'beforeend',
-        `
+        `<span class="messages__connection connection">${data.connectedUser} has connected to the chat</span>`
+      );
+    } else if (data.disconnectedUser) {
+      messagesContainer.insertAdjacentHTML(
+        'beforeend',
+        `<span class="messages__connection disconnection">${data.disconnectedUser} has left the chat</span>`
+      );
+    } else {
+      const receivedUserID = data.userID;
+      const storedUserID = localStorage.getItem('userID');
+      const userName = data.userName;
+      const text = data.message;
+      const time = new Date().toLocaleString('uk-UA', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      if (receivedUserID === storedUserID) {
+        messagesContainer.insertAdjacentHTML(
+          'beforeend',
+          `
         <div class="messages__request">
             <div class="messages__header">
                  <p class="messages__sender">${userName}</p>
@@ -109,11 +137,11 @@ function fuckingSheet() {
             </div>
         </div>
         `
-      );
-    } else {
-      messagesContainer.insertAdjacentHTML(
-        'beforeend',
-        `
+        );
+      } else {
+        messagesContainer.insertAdjacentHTML(
+          'beforeend',
+          `
       <div class="messages__respond">
            <div class="messages__header">
                 <p class="messages__sender">${userName}</p>
@@ -126,7 +154,9 @@ function fuckingSheet() {
             </div>
         </div>
       `
-      );
+        );
+      }
     }
   };
-}
+
+ }
